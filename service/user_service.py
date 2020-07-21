@@ -37,3 +37,9 @@ class UserService:
 
         return token.decode('utf-8')
 
+    def follow(self, user_id, follow_id):
+        return self.user_dao.insert_follow(user_id, follow_id)
+
+    def unfollow(self, user_id, unfollow_id):
+        return self.user_dao.insert_unfollow(user_id, unfollow_id)
+
