@@ -1,19 +1,21 @@
+import jwt
 import bcrypt
 import pytest
-from test import config
+import config
 
 from model import UserDao, TweetDao
+from service import UserService, TweetService
 from sqlalchemy import create_engine, text
 
 database = create_engine(config.test_config['DB_URL'], encoding='utf-8', max_overflow=0)
 
 @pytest.fixture
-def user_dao():
-    return UserDao(database)
+def user_service():
+    return UserService(UserDao(database), config.test_config)
 
 @pytest.fixture
-def tweet_dao():
-    return TweetDao(database)
+def tweet_service():
+    return TweetService(TweetDao(database))
 
 def setup_function():
     # Create a test user
@@ -99,57 +101,63 @@ def get_follow_list(user_id):
 
     return [int(row['id']) for row in rows]
 
-def test_insert_user(user_dao):
+def test_create_new_user(user_service):
     new_user = {
         'name': '홍길동',
         'email': 'hong@test.com',
-        'profile': '동에번쩍 서에번쩍',
+        'profile': '동쪽에서 번쩍, 서쪽에서 번쩍',
         'password': 'test1234'
     }
 
-    new_user_id = user_dao.insert_user(new_user)
-    user = get_user(new_user_id)
+    new_user_id = user_service.create_new_user(new_user)
+    created_user = get_user(new_user_id)
 
-    assert user == {
+    assert created_user == {
         'id': new_user_id,
         'name': new_user['name'],
         'email': new_user['email'],
         'profile': new_user['profile']
     }
 
-def test_get_user_id_and_password(user_dao):
-    # get_user_id_and_password 메소드를 호출하여 사용자의 아이디와 비밀번호 해시값을 읽어들인다.
-    # 사용자는 이미 setup_function에서 생성된 사용자를 사용한다.
-    user_credential = user_dao.get_user_id_and_password(email='songew@gmail.com')
+def test_login(user_service):
+    assert user_service.login({
+        'email': 'songew@gmail.com',
+        'password': 'test password'
+    })
 
-    # 먼저 사용자 아이디가 맞는지 확인한다.
-    assert user_credential['id'] == 1
+    # 잘못된 비번으로 로그인했을 때 False가 리턴되는지 테스트
+    assert not user_service.login({
+        'email': 'songew@gmail.com',
+        'password': 'test1234'
+    })
 
-    # 그리고 사용자 비밀번호가 맞는지 bcrypt의 checkpw 메소드를 사용해서 확인한다.
-    assert bcrypt.checkpw('test password'.encode('utf-8'), user_credential['hashed_password'].encode('utf-8'))
 
-def test_insert_follow(user_dao):
-    # insert_follow 메소드를 사용하여 사용자 1이 사용자 2를 팔로우하도록 한다.
-    # 사용자 1과 2는 setup_function에서 이미 생성되었다.
-    user_dao.insert_follow(user_id=1, follow_id=2)
+def test_generate_access_token(user_service):
+    ## token 생성후 decode 해서 동일한 유저 아이디가 나오는지 테스트
+    token = user_service.generate_access_token(1)
+    payload = jwt.decode(token, config.JWT_SECRET_KEY, 'HS256')
 
+    assert payload['user_id'] == 1
+
+
+def test_follow(user_service):
+    user_service.follow(1, 2)
     follow_list = get_follow_list(1)
 
     assert follow_list == [2]
 
-def test_insert_unfollow(user_dao):
-    # insert_follow 메소드를 사용하여 사용자 1이 사용자 2를 팔로우한 후 언팔로우 한다.
-    # 사용자 1과 2는 setup_fucntion에서 이미 생성되었다.
-    user_dao.insert_follow(user_id=1, follow_id=2)
-    user_dao.insert_unfollow(user_id=1, unfollow_id=2)
 
+def test_unfollow(user_service):
+    user_service.follow(1, 2)
+    user_service.unfollow(1, 2)
     follow_list = get_follow_list(1)
 
     assert follow_list == []
 
-def test_insert_tweet(tweet_dao):
-    tweet_dao.insert_tweet(1, 'tweet test')
-    timeline = tweet_dao.get_timeline(1)
+
+def test_tweet(tweet_service):
+    tweet_service.tweet(1, "tweet test")
+    timeline = tweet_service.get_timeline(1)
 
     assert timeline == [
         {
@@ -158,24 +166,25 @@ def test_insert_tweet(tweet_dao):
         }
     ]
 
-def test_timeline(user_dao, tweet_dao):
-    tweet_dao.insert_tweet(1, "tweet test")
-    tweet_dao.insert_tweet(2, "tweet test 2")
-    user_dao.insert_follow(1, 2)
 
-    timeline = tweet_dao.get_timeline(1)
+def test_timeline(user_service, tweet_service):
+    tweet_service.tweet(1, "tweet test")
+    tweet_service.tweet(2, "tweet test 2")
+    user_service.follow(1, 2)
+
+    timeline = tweet_service.get_timeline(1)
 
     assert timeline == [
         {
             'user_id': 2,
-            'tweet': "Hello World!"
+            'tweet': 'Hello World!'
         },
         {
             'user_id': 1,
-            'tweet': "tweet test"
+            'tweet': 'tweet test'
         },
         {
             'user_id': 2,
-            'tweet': "tweet test 2"
+            'tweet': 'tweet test 2'
         }
     ]

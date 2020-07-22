@@ -1,4 +1,4 @@
-from test import config
+import config
 import pytest
 import json, bcrypt
 

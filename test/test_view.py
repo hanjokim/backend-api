@@ -1,7 +1,7 @@
 import pytest
 import bcrypt
 import json
-from test import config
+import config
 
 from app import create_app
 from sqlalchemy import create_engine, text
