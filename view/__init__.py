@@ -1,6 +1,7 @@
 import jwt
 
-from flask import request,jsonify, current_app, Response, g
+from flask import request,jsonify, current_app, Response, g, send_file
+from werkzeug.utils import secure_filename
 from flask.json import JSONEncoder
 from functools import wraps
 
@@ -123,3 +124,30 @@ def create_endpoints(app, services):
             'user_id': g.user_id,
             'timeline': timeline
         })
+
+    @app.route('/profile_picture', methods=['POST'])
+    @login_required
+    def upload_profile_picture():
+        user_id = g.user_id
+
+        if 'profile_pic' not in request.files:
+            return 'File is missing', 404
+
+        profile_pic = request.files['profile_pic']
+
+        if profile_pic.filename == '':
+            return 'File is missing', 404
+
+        filename = secure_filename(profile_pic.filename)
+        user_service.save_profile_picture(profile_pic, filename, user_id)
+
+        return '', 200
+
+    @app.route('/profile_picture/<int:user_id>', methods=['GET'])
+    def get_profile_picture(user_id):
+        profile_picture = user_service.get_profile_picture(user_id)
+
+        if profile_picture:
+            return send_file(profile_picture)
+        else:
+            return '', 404

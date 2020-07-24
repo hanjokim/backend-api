@@ -1,7 +1,7 @@
 import sys
 
 from flask_script import Manager
-from app_full import create_app
+from app import create_app
 from flask_twisted import Twisted
 from twisted.python import log
 
