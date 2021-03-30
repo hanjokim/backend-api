@@ -52,7 +52,7 @@ pycairo==1.16.2
 pycparser==2.20
 pycrypto==2.6.1
 pycups==1.9.73
-Pygments==2.2.0
+Pygments==2.7.4
 pygobject==3.26.1
 PyHamcrest==2.0.2
 PyJWT==1.7.1
